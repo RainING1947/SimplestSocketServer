@@ -1,0 +1,4 @@
+﻿  socketServer.cpp
+c:\users\wxiaoyu\desktop\socketserver\socketserver\socketserver.h(236): warning C4800: “int”: 将值强制为布尔值“true”或“false”(性能警告)
+  SocketServer.vcxproj -> C:\Users\wxiaoyu\Desktop\SocketServer\Debug\SocketServer.exe
+  SocketServer.vcxproj -> C:\Users\wxiaoyu\Desktop\SocketServer\Debug\SocketServer.pdb (Full PDB)
