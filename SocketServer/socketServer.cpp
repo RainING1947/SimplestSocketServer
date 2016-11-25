@@ -9,10 +9,22 @@ int main()
 		if (socketServer->GetSessionState())
 		{
 			std::cout << socketServer->GetRecvStr() << std::endl;
-			socketServer->Send("HelloWord");
+			socketServer->ClearRecvBuf();
 		}
 	} while (socketServer->GetSessionState());
 
-	socketServer->ShutDown();
+	std::string str;	
+	do {
+		std::cout << "What to send to client: ";
+		std::cin >> str;
+		if (str != "$")
+			socketServer->Send(str);
+	} while (str != "$");
+
+	socketServer->ShutDown(); //this Shutdown cleanup resources which means connection terminate(differs from that of client)
+	
+	delete socketServer;
+
+	std::cin.get();
 	return 0;
 }

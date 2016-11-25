@@ -27,6 +27,7 @@ public:
 	void AcceptSock();
 	void RecvAndSend();
 	void Receive();
+	void ClearRecvBuf();
 	void Send(std::string sendStr);
 	void ShutDown();
 	bool GetSessionState(); //iResult>0 loop send and recv, iResult=0 closing connection, iResult<0 error
@@ -195,6 +196,11 @@ void SocketServer::Receive()
 		//system("pause");
 		return;
 	}
+}
+
+void SocketServer::ClearRecvBuf()
+{
+	memset(recvbuf, ' ', sizeof(recvbuf));
 }
 
 void SocketServer::Send(std::string sendStr)
