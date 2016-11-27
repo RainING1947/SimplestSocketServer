@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string>
+#include <vector>
 
 #pragma comment(lib, "ws2_32.lib") 
 
@@ -14,44 +15,29 @@ using namespace std;
 #define DEFAULT_PORT "27015"
 #define DEFAULT_BUFLEN 128
 
+#define MAXSIZE_POOL 3
+
+SOCKET cSock[MAXSIZE_POOL] = { INVALID_SOCKET };
+
 class SocketServer
 {
 public:
 	SocketServer(){}
 	~SocketServer(){}
-	void PrepareSock();
 	void InitWinSock();
 	void InitCheckListenSock();
 	void BindSock();
 	void ListenSock();
-	void AcceptSock();
-	void RecvAndSend();
-	void Receive();
-	void ClearRecvBuf();
-	void Send(std::string sendStr);
 	void ShutDown();
-	bool GetSessionState(); //iResult>0 loop send and recv, iResult=0 closing connection, iResult<0 error
-	std::string GetRecvStr();
+	int existingClientCount = 0;
+	SOCKET ListenSocket = INVALID_SOCKET;
 private:
 	WSADATA wsaData;
 	int iResult;
 	struct addrinfo *result = NULL;
 	struct addrinfo hints;
-	SOCKET ListenSocket = INVALID_SOCKET;
-	SOCKET ClientSocket = INVALID_SOCKET;
-	char recvbuf[DEFAULT_BUFLEN] = { ' ' };
-	int iSendResult;
-	int recvbuflen = DEFAULT_BUFLEN;
 };
 
-void SocketServer::PrepareSock()
-{
-	this->InitWinSock();
-	this->InitCheckListenSock();
-	this->BindSock();
-	this->ListenSock();
-	this->AcceptSock();
-}
 
 //Initialize WinSock
 void SocketServer::InitWinSock()
@@ -97,8 +83,11 @@ void SocketServer::InitCheckListenSock()
 //Bind socket to IP address or port
 void SocketServer::BindSock()
 {
-	iResult = bind(ListenSocket, result->ai_addr,
+	/*iResult = bind(ListenSocket, result->ai_addr,
+		(int)result->ai_addrlen);*/
+	bind(ListenSocket, result->ai_addr,
 		(int)result->ai_addrlen);
+
 	if (iResult == SOCKET_ERROR)
 	{
 		std::cout << "Bind failed with error " << WSAGetLastError() << std::endl;
@@ -125,127 +114,73 @@ void SocketServer::ListenSock()
 	}
 }
 
-void SocketServer::AcceptSock()
+
+void SocketServer::ShutDown()
 {
-	ClientSocket = accept(ListenSocket, NULL, NULL);
-	if (ClientSocket == INVALID_SOCKET)
+	for (auto& ClientSocket : cSock)
 	{
-		std::cout << "Accept failed with error " << WSAGetLastError() << std::endl;
-		closesocket(ListenSocket);
-		WSACleanup();
-		return;
-	}
-}
-
-void SocketServer::RecvAndSend()
-{
-	do {
-		iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
-		if (iResult > 0)
+		iResult = shutdown(ClientSocket, SD_SEND);
+		if (iResult == SOCKET_ERROR)
 		{
-			cout << "Bytes received: " << iResult << " " << recvbuf << endl;
-
-			string recvStr = recvbuf;
-			cout << "String got: " + recvStr << endl;
-
-			//Echo the buffer back to the sender
-			iSendResult = send(ClientSocket, recvbuf, iResult, 0);
-			if (iSendResult == SOCKET_ERROR)
-			{
-				cout << "Send failed " << WSAGetLastError() << endl;
-				closesocket(ClientSocket);
-				WSACleanup();
-				//system("pause");
-				return;
-			}
-
-			cout << "Bytes sent: " << iSendResult << " " << recvbuf << endl;
-		}
-		else if (iResult == 0)
-		{
-			cout << "Connection Closing..." << endl;
-		}
-		else
-		{
-			cout << "recv failed with error " << WSAGetLastError();
+			cout << "Shutdown failed with error" << WSAGetLastError() << endl;
 			closesocket(ClientSocket);
 			WSACleanup();
 			//system("pause");
 			return;
 		}
 
-	} while (iResult > 0);
-}
-
-void SocketServer::Receive()
-{
-	iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
-	if (iResult > 0)
-	{
-		cout << "Bytes received: " << iResult << " " << recvbuf << endl;
-	}
-	else if (iResult == 0)
-	{
-		cout << "Connection Closing..." << endl;
-	}
-	else
-	{
-		cout << "recv failed with error " << WSAGetLastError();
+		//Cleanup
 		closesocket(ClientSocket);
 		WSACleanup();
-		//system("pause");
-		return;
 	}
-}
-
-void SocketServer::ClearRecvBuf()
-{
-	memset(recvbuf, ' ', sizeof(recvbuf));
-}
-
-void SocketServer::Send(std::string sendStr)
-{
-	//Echo the buffer back to the sender
-	iSendResult = send(ClientSocket, sendStr.c_str(), sendStr.length(), 0);
-	if (iSendResult == SOCKET_ERROR)
-	{
-		cout << "Send failed " << WSAGetLastError() << endl;
-		closesocket(ClientSocket);
-		WSACleanup();
-		//system("pause");
-		return;
-	}
-	cout << "String sent: " << iSendResult << " " << sendStr << endl;
-}
-
-void SocketServer::ShutDown()
-{
-	iResult = shutdown(ClientSocket, SD_SEND);
-	if (iResult == SOCKET_ERROR)
-	{
-		cout << "Shutdown failed with error" << WSAGetLastError() << endl;
-		closesocket(ClientSocket);
-		WSACleanup();
-		//system("pause");
-		return;
-	}
-
-	//Cleanup
-	closesocket(ClientSocket);
-	WSACleanup();
-
 	system("pause");
 }
 
-bool SocketServer::GetSessionState()
-{
-	return (bool)iResult;
-}
 
-std::string SocketServer::GetRecvStr()
+DWORD WINAPI ProcessClientRequests(int pid, LPVOID cParam, LPVOID sParam)
 {
-	std::string recvStr = recvbuf;
-	return recvStr;
+	SOCKET* clientSocket = (SOCKET*)cParam;
+	SocketServer *socketServer = (SocketServer*)sParam;
+	std::cout << "Thread " << pid << std::endl;
+	char buff[DEFAULT_BUFLEN] = { NULL };
+	std::string strSend;
+	while (true) {
+		int result = recv(*clientSocket, buff, DEFAULT_BUFLEN, 0);
+		if (result > 0)
+		{
+			std::string strRecv = buff;
+			if (strRecv == "$")
+				break;
+			std::cout << "Thread " << pid << " " << strRecv << std::endl;
+			//Way to talk
+			/*if (strRecv == "call0")
+				send(cSock[0], "calling", 7, NULL);*/
+			for (auto& b : buff) { b = NULL; }
+		}
+		else if (result == -1) //client window closed, release resources and return
+		{
+			std::cout << "Client " << pid << "'s window closed, connection terminated" << std::endl;
+			closesocket(*clientSocket);
+
+			socketServer->existingClientCount--;
+			cSock[pid] = INVALID_SOCKET;
+
+			return 0;
+		}
+	}	
+	do {
+		std::cout << "What to send to client " << pid << ": ";
+		std::cin >> strSend;
+		if (strSend != "$")
+			send(*clientSocket, strSend.c_str(), strSend.length(), NULL);
+	} while (strSend != "$");
+
+	closesocket(*clientSocket);
+
+	socketServer->existingClientCount--;
+	cSock[pid] = INVALID_SOCKET;
+
+	return 0;
 }
 
 #endif //!SOCKET_SERVER_H

@@ -1,36 +1,9 @@
 ## Little Instruction
 
-***This is the <u>simplest</u> socket program for green-hand learning***
+***A socket program for green-hand learning***
 
-**No multithread    No synchronize    No multi-client**
+*support multi-thread*    *support multi-client*    *not support synchronization*
 
-Code fetched from [https://msdn.microsoft.com](https://msdn.microsoft.com/en-us/library/windows/desktop/ms737591(v=vs.85).aspx) and reformed to fit in concrete project
+There are two arrays - we can call pools - `threads` and  `cSock`.One stores `thread`, one stores `Client SOCKET`, and elements in them are corresponding.Were there a `SOCKET` taking over a `client`, a `thread` would manage session between the `client` and `server` itself.
 
-### function
-
-```c++
-void PrepareSock();
-void InitWinSock();
-void InitCheckListenSock();
-void BindSock();
-void ListenSock();
-void AcceptSock();
-void RecvAndSend();
-void Receive();
-void ClearRecvBuf();
-void Send(std::string sendStr);
-void ShutDown();
-bool GetSessionState();
-std::string GetRecvStr()
-```
-
-### How to use it?
-
-*step1* `new` a `SocketServer` object and it possesses all variables and functions
-
-*step2*  call for `Prepare`function and it will finish preparation so that you don't need to call every single function on your own
-
-*step3* Call for `Send`function to send content you want
-
-*step4* Receive content from server and free resources
-
+A `SOCKET POOL` is necessary for situation: "*Client A* wants to talk to *Client B*, the only way is through *Server S* ,so *S* must find which socket B is".In the way mentioned up there, *S* gets *B's* No. from *A*, then notifies *B*.
